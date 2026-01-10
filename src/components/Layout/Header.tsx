@@ -17,7 +17,6 @@ export function Header({ onAddContact, onShowRequests, onShowSent, pendingCount 
     <header className="app-header">
       <div className="header-brand">
         <h1 className="header-title">Relation</h1>
-        <span className="header-tagline">Verified connections that matter</span>
       </div>
 
       <div className="header-actions">

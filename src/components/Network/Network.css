@@ -1,0 +1,30 @@
+/* Network Status - Minimal */
+
+.network-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0.625rem 1rem;
+  background: #fafafa;
+  font-size: 0.8rem;
+}
+
+.status-text {
+  color: #000;
+  font-weight: 500;
+}
+
+.status-progress {
+  color: #000;
+  font-style: italic;
+  opacity: 0.5;
+}
+
+@media (max-width: 480px) {
+  .network-status {
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+}

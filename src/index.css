@@ -1,0 +1,38 @@
+/* Global Reset & Base Styles */
+
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+:root {
+  font-family: 'EB Garamond', Georgia, 'Times New Roman', serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-width: 320px;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+a {
+  color: #000;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #666;
+}
+
+button {
+  font-family: inherit;
+}

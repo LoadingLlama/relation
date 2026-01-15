@@ -3,6 +3,15 @@
  */
 
 /**
+ * Simple connection info for displaying a user's contacts
+ */
+export interface ConnectionInfo {
+  id: string;
+  name: string;
+  relationship_type: string;
+}
+
+/**
  * User profile
  */
 export interface User {
@@ -11,7 +20,9 @@ export interface User {
   name: string;
   phone_hash: string | null;
   avatar_url: string | null;
+  linkedin_url: string | null;
   contribution_score: number;
+  connections?: ConnectionInfo[];
   created_at: string;
   updated_at: string;
 }

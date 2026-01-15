@@ -31,10 +31,35 @@ const createDemoUser = (): User => ({
   name: 'You',
   phone_hash: hashPhone('5551234567'),
   avatar_url: null,
+  linkedin_url: null,
   contribution_score: 0,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
+
+// Generate random mock connections for a contact
+const generateMockConnections = () => {
+  const names = [
+    'Emma Wilson', 'James Brown', 'Sophia Garcia', 'Liam Martinez',
+    'Olivia Anderson', 'Noah Thomas', 'Ava Jackson', 'William White',
+    'Isabella Harris', 'Benjamin Clark', 'Mia Lewis', 'Lucas Robinson'
+  ];
+  const types = ['Friend', 'Coworker', 'College friend', 'Family', 'Neighbor', 'Gym buddy'];
+  const count = Math.floor(Math.random() * 5) + 2; // 2-6 connections
+
+  const shuffled = [...names].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count).map(name => ({
+    id: crypto.randomUUID(),
+    name,
+    relationship_type: types[Math.floor(Math.random() * types.length)]
+  }));
+};
+
+// Generate a random LinkedIn URL
+const generateLinkedIn = (name: string) => {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  return `https://linkedin.com/in/${slug}-${Math.floor(Math.random() * 1000)}`;
+};
 
 // Simple hash function for demo
 function hashPhone(phone: string): string {
@@ -179,7 +204,9 @@ function App() {
         name: request.from_name || 'Unknown',
         phone_hash: '',
         avatar_url: null,
+        linkedin_url: generateLinkedIn(request.from_name || 'Unknown'),
         contribution_score: 1,
+        connections: generateMockConnections(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
@@ -234,7 +261,9 @@ function App() {
         name: request.to_name,
         phone_hash: request.to_phone_hash,
         avatar_url: null,
+        linkedin_url: generateLinkedIn(request.to_name),
         contribution_score: 1,
+        connections: generateMockConnections(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },

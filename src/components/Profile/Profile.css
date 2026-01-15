@@ -385,6 +385,26 @@
   font-style: italic;
 }
 
+/* LinkedIn Link */
+.linkedin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #0077B5;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: opacity 0.15s ease;
+}
+
+.linkedin-link:hover {
+  opacity: 0.8;
+}
+
+.linkedin-link svg {
+  flex-shrink: 0;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .profile-panel {

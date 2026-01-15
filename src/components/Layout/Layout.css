@@ -38,14 +38,16 @@
 .add-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 50%;
   background: #007AFF;
   color: #fff;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 1.25rem;
+  font-weight: 300;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -56,6 +58,11 @@
 
 .add-btn:active {
   background: #0055CC;
+}
+
+.add-btn .add-icon {
+  line-height: 1;
+  margin-top: -1px;
 }
 
 .requests-btn {
@@ -240,19 +247,6 @@
 }
 
 @media (max-width: 640px) {
-  .add-text {
-    display: none;
-  }
-
-  .add-btn {
-    padding: 0.625rem 0.875rem;
-    border-radius: 8px;
-  }
-
-  .add-icon {
-    font-size: 1.5rem;
-  }
-
   .requests-btn {
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;

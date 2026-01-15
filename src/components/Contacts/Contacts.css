@@ -1,9 +1,8 @@
-/* Contacts List Styles */
+/* Contacts List Styles - macOS Dark Theme */
 
 .contacts-list {
   flex: 1;
   overflow-y: auto;
-  background: #fff;
 }
 
 .contacts-empty {
@@ -12,118 +11,95 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #999;
+  color: #666;
   text-align: center;
   padding: 2rem;
 }
 
 .contacts-empty p {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 13px;
 }
 
 .contacts-empty-hint {
   margin-top: 0.5rem !important;
-  font-size: 0.9rem !important;
-  color: #bbb;
+  font-size: 12px !important;
+  color: #555;
 }
 
-.contacts-group {
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.contacts-letter {
-  padding: 0.5rem 1.25rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #999;
-  background: #fafafa;
+/* Section Header (My Card, A, B, etc.) */
+.contacts-section {
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+  background: #2d2d2d;
   position: sticky;
   top: 0;
   z-index: 1;
 }
 
+/* Contact Item - Simple Text */
 .contact-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.875rem 1.25rem;
+  padding: 6px 16px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.1s ease;
+  font-size: 13px;
+  color: #fff;
+  border-left: 3px solid transparent;
 }
 
 .contact-item:hover {
-  background: #f8f8f8;
+  background: #3d3d3d;
 }
 
-.contact-item:active {
-  background: #f0f0f0;
-}
-
-.contact-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+.contact-item.selected {
   background: #007AFF;
+  border-left-color: #007AFF;
+}
+
+.contact-item.selected:hover {
+  background: #0066DD;
+}
+
+/* Contact Name */
+.contact-name {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* My Card Section */
+.my-card-section {
+  border-bottom: 1px solid #3d3d3d;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.my-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
   color: #fff;
+}
+
+.my-card-item:hover {
+  background: #3d3d3d;
+}
+
+.my-card-item.selected {
+  background: #007AFF;
+}
+
+.my-card-icon {
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.contact-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-}
-
-.contact-name {
-  font-size: 1rem;
-  font-weight: 500;
-  color: #000;
-}
-
-.contact-type {
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.contact-chevron {
-  color: #ccc;
-  flex-shrink: 0;
-}
-
-/* Search bar */
-.contacts-search {
-  padding: 0.75rem 1rem;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.contacts-search input {
-  width: 100%;
-  padding: 0.625rem 1rem;
-  border: none;
-  border-radius: 8px;
-  background: #f5f5f5;
-  font-size: 0.95rem;
-  font-family: inherit;
-  color: #000;
-}
-
-.contacts-search input:focus {
-  outline: none;
-  background: #f0f0f0;
-}
-
-.contacts-search input::placeholder {
-  color: #999;
+  color: #888;
 }

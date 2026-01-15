@@ -34,9 +34,8 @@ export function Header({ onAddContact, onShowRequests, onShowSent, pendingCount 
             Requests
           </button>
         )}
-        <button className="add-btn" onClick={onAddContact}>
+        <button className="add-btn" onClick={onAddContact} title="Add Connection">
           <span className="add-icon">+</span>
-          <span className="add-text">Add Connection</span>
         </button>
       </div>
     </header>

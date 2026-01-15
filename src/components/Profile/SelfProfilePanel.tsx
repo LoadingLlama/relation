@@ -2,7 +2,8 @@
  * SelfProfilePanel - LinkedIn-style self profile view with editing
  */
 
-import { useState, FormEvent } from 'react';
+import { useState, useCallback, FormEvent } from 'react';
+import Cropper, { Area } from 'react-easy-crop';
 import { User } from '../../types';
 import './Profile.css';
 
@@ -10,6 +11,48 @@ interface SelfProfilePanelProps {
   user: User;
   onClose: () => void;
   onUpdate: (updates: Partial<User>) => void;
+}
+
+/**
+ * Creates a cropped image from the original image and crop area.
+ */
+async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<string> {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) {
+    throw new Error('Could not get canvas context');
+  }
+
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height
+  );
+
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+/**
+ * Creates an HTMLImageElement from a source URL.
+ */
+function createImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => resolve(image));
+    image.addEventListener('error', (error) => reject(error));
+    image.src = url;
+  });
 }
 
 export function SelfProfilePanel({ user, onClose, onUpdate }: SelfProfilePanelProps) {
@@ -21,6 +64,43 @@ export function SelfProfilePanel({ user, onClose, onUpdate }: SelfProfilePanelPr
   const [location, setLocation] = useState(user.location || '');
   const [about, setAbout] = useState(user.about || '');
   const [linkedinUrl, setLinkedinUrl] = useState(user.linkedin_url || '');
+
+  // Banner crop state
+  const [bannerToCrop, setBannerToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  const onCropComplete = useCallback((_: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleBannerSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        setBannerToCrop(dataUrl);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleCropSave = async () => {
+    if (bannerToCrop && croppedAreaPixels) {
+      const croppedImage = await getCroppedImg(bannerToCrop, croppedAreaPixels);
+      onUpdate({ banner_url: croppedImage });
+      setBannerToCrop(null);
+    }
+  };
+
+  const handleCropCancel = () => {
+    setBannerToCrop(null);
+  };
 
   const handleSave = (e: FormEvent) => {
     e.preventDefault();
@@ -60,17 +140,7 @@ export function SelfProfilePanel({ user, onClose, onUpdate }: SelfProfilePanelPr
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const dataUrl = event.target?.result as string;
-                  onUpdate({ banner_url: dataUrl });
-                };
-                reader.readAsDataURL(file);
-              }
-            }}
+            onChange={handleBannerSelect}
             style={{ display: 'none' }}
           />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -238,6 +308,50 @@ export function SelfProfilePanel({ user, onClose, onUpdate }: SelfProfilePanelPr
           </>
         )}
       </div>
+
+      {/* Banner Crop Modal */}
+      {bannerToCrop && (
+        <div className="crop-modal-overlay">
+          <div className="crop-modal">
+            <div className="crop-modal-header">
+              <h3>Crop Banner Image</h3>
+            </div>
+            <div className="crop-container">
+              <Cropper
+                image={bannerToCrop}
+                crop={crop}
+                zoom={zoom}
+                aspect={16 / 5}
+                onCropChange={setCrop}
+                onCropComplete={onCropComplete}
+                onZoomChange={setZoom}
+              />
+            </div>
+            <div className="crop-controls">
+              <label className="zoom-label">
+                Zoom
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  value={zoom}
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="zoom-slider"
+                />
+              </label>
+            </div>
+            <div className="crop-actions">
+              <button className="cancel-edit-btn" onClick={handleCropCancel}>
+                Cancel
+              </button>
+              <button className="save-btn" onClick={handleCropSave}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

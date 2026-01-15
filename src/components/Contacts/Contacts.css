@@ -70,6 +70,21 @@
   text-overflow: ellipsis;
 }
 
+/* Contact Headline */
+.contact-headline {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.contact-item.selected .contact-headline {
+  color: #fff;
+}
+
 /* My Card Section */
 .my-card-section {
   border-bottom: 1px solid #3d3d3d;
@@ -102,4 +117,8 @@
   align-items: center;
   justify-content: center;
   color: #888;
+}
+
+.my-card-item.selected .my-card-icon {
+  color: #fff;
 }

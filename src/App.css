@@ -127,14 +127,12 @@ body {
   align-items: center;
 }
 
-.panel-footer-left {
-  display: flex;
-  gap: 8px;
-}
-
+.panel-footer-left,
+.panel-footer-center,
 .panel-footer-right {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 /* Icon Buttons */
@@ -159,6 +157,23 @@ body {
 
 .icon-btn:active {
   background: #5d5d5d;
+}
+
+.sign-out-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #666;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sign-out-btn:hover {
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.1);
 }
 
 /* Text Buttons */

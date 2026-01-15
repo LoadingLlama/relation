@@ -1,23 +1,21 @@
 /**
- * Modal for adding a new relationship request
+ * Modal for adding a new connection request
  */
 
 import { useState, FormEvent } from 'react';
-import { RelationshipRequestForm } from '../../types';
+import { ConnectionRequestForm } from '../../types';
 import './Relationships.css';
 
 interface AddRelationshipModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: RelationshipRequestForm) => Promise<void>;
+  onAdd: (data: ConnectionRequestForm) => Promise<void>;
 }
 
 export function AddRelationshipModal({ isOpen, onClose, onAdd }: AddRelationshipModalProps) {
-  const [formData, setFormData] = useState<RelationshipRequestForm>({
+  const [formData, setFormData] = useState<ConnectionRequestForm>({
     to_name: '',
     to_phone: '',
-    relationship_type: '',
-    hide_reason: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +23,15 @@ export function AddRelationshipModal({ isOpen, onClose, onAdd }: AddRelationship
   if (!isOpen) return null;
 
   const validatePhone = (phone: string): boolean => {
-    const cleaned = phone.replace(/\D/g, '');
-    return cleaned.length >= 10 && cleaned.length <= 15;
+    const digits = phone.replace(/\D/g, '');
+    return digits.length >= 10;
+  };
+
+  const formatPhone = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -43,21 +48,10 @@ export function AddRelationshipModal({ isOpen, onClose, onAdd }: AddRelationship
       return;
     }
 
-    if (!formData.relationship_type.trim()) {
-      setError('Relationship type is required');
-      return;
-    }
-
-    const words = formData.relationship_type.trim().split(/\s+/);
-    if (words.length > 2) {
-      setError('Relationship type should be 1-2 words');
-      return;
-    }
-
     setLoading(true);
     try {
       await onAdd(formData);
-      setFormData({ to_name: '', to_phone: '', relationship_type: '', hide_reason: false });
+      setFormData({ to_name: '', to_phone: '' });
       onClose();
     } catch (err) {
       setError('Failed to send request');
@@ -78,7 +72,7 @@ export function AddRelationshipModal({ isOpen, onClose, onAdd }: AddRelationship
           {error && <div className="form-error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="name">Their Name *</label>
+            <label htmlFor="name">Name</label>
             <input
               id="name"
               type="text"
@@ -90,45 +84,17 @@ export function AddRelationshipModal({ isOpen, onClose, onAdd }: AddRelationship
           </div>
 
           <div className="form-group">
-            <label htmlFor="phone">Their Phone Number *</label>
+            <label htmlFor="phone">Phone Number</label>
             <input
               id="phone"
               type="tel"
               value={formData.to_phone}
-              onChange={e => setFormData(prev => ({ ...prev, to_phone: e.target.value }))}
+              onChange={e => setFormData(prev => ({ ...prev, to_phone: formatPhone(e.target.value) }))}
               placeholder="(555) 123-4567"
               required
             />
             <span className="form-hint">
-              They'll need to verify with the same number
-            </span>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="type">How do you know them? *</label>
-            <input
-              id="type"
-              type="text"
-              value={formData.relationship_type}
-              onChange={e => setFormData(prev => ({ ...prev, relationship_type: e.target.value }))}
-              placeholder="e.g., College friend, Coworker"
-              maxLength={30}
-              required
-            />
-            <span className="form-hint">1-2 words describing the relationship</span>
-          </div>
-
-          <div className="form-group checkbox-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={formData.hide_reason}
-                onChange={e => setFormData(prev => ({ ...prev, hide_reason: e.target.checked }))}
-              />
-              <span>Hide relationship type from others</span>
-            </label>
-            <span className="form-hint">
-              Only you and they will see how you know each other
+              They'll receive a connection request
             </span>
           </div>
 
@@ -136,18 +102,8 @@ export function AddRelationshipModal({ isOpen, onClose, onAdd }: AddRelationship
             <button type="button" className="btn-secondary" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn-connect" disabled={loading}>
-              {loading ? (
-                'Connecting...'
-              ) : (
-                <>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    <path d="M6 10V7H4v3H1v2h3v3h2v-3h3v-2H6z"/>
-                  </svg>
-                  Connect
-                </>
-              )}
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Sending...' : 'Send Request'}
             </button>
           </div>
         </form>

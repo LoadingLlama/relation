@@ -1,17 +1,17 @@
 /**
- * Panel showing relationship requests and their status
+ * Panel showing connection requests and their status
  * Incoming requests shown first (requests sent TO you)
  * Outgoing requests shown below (requests you sent)
  */
 
-import { RelationshipRequest } from '../../types';
+import { ConnectionRequest } from '../../types';
 import './Relationships.css';
 
 interface PendingRequestsProps {
   isOpen: boolean;
   onClose: () => void;
-  requests: RelationshipRequest[];
-  onAcceptClick: (request: RelationshipRequest) => void;
+  requests: ConnectionRequest[];
+  onAcceptClick: (request: ConnectionRequest) => void;
   onSimulateAccept: (requestId: string) => void;
   onWithdraw: (requestId: string) => void;
 }
@@ -57,7 +57,9 @@ export function PendingRequests({ isOpen, onClose, requests, onAcceptClick, onSi
                       </div>
                       <div className="request-info">
                         <span className="request-name">{request.from_name}</span>
-                        <span className="request-type">says you're their {request.relationship_type}</span>
+                        {request.from_headline && (
+                          <span className="request-headline">{request.from_headline}</span>
+                        )}
                       </div>
                       <div className="request-actions">
                         <button
@@ -89,7 +91,7 @@ export function PendingRequests({ isOpen, onClose, requests, onAcceptClick, onSi
                       </div>
                       <div className="request-info">
                         <span className="request-name">{request.to_name}</span>
-                        <span className="request-type">{request.relationship_type}</span>
+                        <span className="request-headline">{request.to_email}</span>
                       </div>
                       <div className="request-actions">
                         <span className="status-badge pending">Waiting</span>
@@ -125,6 +127,7 @@ export function PendingRequests({ isOpen, onClose, requests, onAcceptClick, onSi
                   </div>
                   {acceptedRequests.map(request => {
                     const name = request.direction === 'incoming' ? request.from_name : request.to_name;
+                    const headline = request.direction === 'incoming' ? request.from_headline : request.to_email;
                     return (
                       <div key={request.id} className="request-item">
                         <div className="request-avatar connected">
@@ -132,7 +135,7 @@ export function PendingRequests({ isOpen, onClose, requests, onAcceptClick, onSi
                         </div>
                         <div className="request-info">
                           <span className="request-name">{name}</span>
-                          <span className="request-type">{request.relationship_type}</span>
+                          {headline && <span className="request-headline">{headline}</span>}
                         </div>
                         <span className="status-badge accepted">Connected</span>
                       </div>

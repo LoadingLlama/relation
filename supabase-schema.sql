@@ -1,158 +1,122 @@
--- Relation App Database Schema v2
--- Full MVP with mutual verification, progressive unlock, and insights
+-- Relation Database Schema
+-- Run this in your Supabase SQL Editor (https://supabase.com/dashboard/project/ufwqkoenmcngcynjiqaz/sql)
 
--- ============================================
--- 1. Users table
--- ============================================
-CREATE TABLE IF NOT EXISTS users (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
+-- Profiles table (extends Supabase auth.users)
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   name TEXT NOT NULL,
-  phone_hash TEXT, -- Hashed phone number for verification
+  email TEXT NOT NULL,
+  phone TEXT,
+  headline TEXT,
+  location TEXT,
+  about TEXT,
   avatar_url TEXT,
-  contribution_score INTEGER DEFAULT 0,
+  banner_url TEXT,
+  linkedin_url TEXT,
+  onboarding_completed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- Enable Row Level Security
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view all users" ON users
-  FOR SELECT USING (true);
+-- Policy: Users can view their own profile
+CREATE POLICY "Users can view own profile" ON profiles
+  FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Users can update own profile" ON users
+-- Policy: Users can insert their own profile
+CREATE POLICY "Users can insert own profile" ON profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Policy: Users can update their own profile
+CREATE POLICY "Users can update own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
--- ============================================
--- 2. Relationship Requests (pending connections)
--- ============================================
-CREATE TABLE IF NOT EXISTS relationship_requests (
+-- Policy: Users can view profiles of their connections (for later)
+CREATE POLICY "Users can view connected profiles" ON profiles
+  FOR SELECT USING (
+    id IN (
+      SELECT user_b FROM connections WHERE user_a = auth.uid()
+      UNION
+      SELECT user_a FROM connections WHERE user_b = auth.uid()
+    )
+  );
+
+-- Connections table
+CREATE TABLE IF NOT EXISTS connections (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  from_user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  to_phone_hash TEXT NOT NULL, -- Hashed phone of target person
-  to_user_id UUID REFERENCES users(id) ON DELETE CASCADE, -- Set when matched
-  to_name TEXT NOT NULL, -- Name provided by requester
-  relationship_type TEXT NOT NULL CHECK (char_length(relationship_type) <= 30),
-  hide_reason BOOLEAN DEFAULT false,
+  user_a UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  user_b UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  connected_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_a, user_b)
+);
+
+-- Enable Row Level Security
+ALTER TABLE connections ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can view their own connections
+CREATE POLICY "Users can view own connections" ON connections
+  FOR SELECT USING (auth.uid() = user_a OR auth.uid() = user_b);
+
+-- Policy: Users can insert connections where they are user_a
+CREATE POLICY "Users can create connections" ON connections
+  FOR INSERT WITH CHECK (auth.uid() = user_a);
+
+-- Policy: Users can delete their own connections
+CREATE POLICY "Users can delete own connections" ON connections
+  FOR DELETE USING (auth.uid() = user_a OR auth.uid() = user_b);
+
+-- Connection requests table
+CREATE TABLE IF NOT EXISTS connection_requests (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  from_user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  to_email TEXT NOT NULL,
+  to_user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  to_name TEXT NOT NULL,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE relationship_requests ENABLE ROW LEVEL SECURITY;
+-- Enable Row Level Security
+ALTER TABLE connection_requests ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view their requests" ON relationship_requests
-  FOR SELECT USING (
-    auth.uid() = from_user_id OR
-    auth.uid() = to_user_id OR
-    (to_user_id IS NULL AND to_phone_hash IN (SELECT phone_hash FROM users WHERE id = auth.uid()))
-  );
+-- Policy: Users can view requests they sent or received
+CREATE POLICY "Users can view own requests" ON connection_requests
+  FOR SELECT USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
 
-CREATE POLICY "Users can create requests" ON relationship_requests
+-- Policy: Users can create requests
+CREATE POLICY "Users can create requests" ON connection_requests
   FOR INSERT WITH CHECK (auth.uid() = from_user_id);
 
-CREATE POLICY "Users can update requests to them" ON relationship_requests
-  FOR UPDATE USING (
-    auth.uid() = to_user_id OR
-    (to_user_id IS NULL AND to_phone_hash IN (SELECT phone_hash FROM users WHERE id = auth.uid()))
-  );
+-- Policy: Users can update requests they received
+CREATE POLICY "Users can update received requests" ON connection_requests
+  FOR UPDATE USING (auth.uid() = to_user_id);
 
--- ============================================
--- 3. Relationships (verified connections)
--- ============================================
-CREATE TABLE IF NOT EXISTS relationships (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_a UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  user_b UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  relationship_type TEXT NOT NULL,
-  hide_reason BOOLEAN DEFAULT false,
-  strength INTEGER DEFAULT 5 CHECK (strength >= 1 AND strength <= 10),
-  last_interaction DATE,
-  verified_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_a, user_b)
-);
+-- Policy: Users can delete requests they sent
+CREATE POLICY "Users can delete sent requests" ON connection_requests
+  FOR DELETE USING (auth.uid() = from_user_id);
 
-ALTER TABLE relationships ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view relationships they're part of" ON relationships
-  FOR SELECT USING (auth.uid() = user_a OR auth.uid() = user_b);
-
-CREATE POLICY "Public can view non-hidden relationships" ON relationships
-  FOR SELECT USING (hide_reason = false);
-
--- ============================================
--- 4. Functions
--- ============================================
-
--- Hash phone number function
-CREATE OR REPLACE FUNCTION hash_phone(phone TEXT)
-RETURNS TEXT AS $$
+-- Function to handle new user signup
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
 BEGIN
-  RETURN encode(sha256(phone::bytea), 'hex');
-END;
-$$ LANGUAGE plpgsql;
-
--- Accept relationship request
-CREATE OR REPLACE FUNCTION accept_relationship_request(request_id UUID)
-RETURNS BOOLEAN AS $$
-DECLARE
-  req relationship_requests%ROWTYPE;
-BEGIN
-  -- Get the request
-  SELECT * INTO req FROM relationship_requests WHERE id = request_id;
-
-  IF req.id IS NULL THEN
-    RETURN false;
-  END IF;
-
-  -- Update request status
-  UPDATE relationship_requests
-  SET status = 'accepted', to_user_id = auth.uid(), updated_at = NOW()
-  WHERE id = request_id;
-
-  -- Create the relationship (order users by ID for consistency)
-  INSERT INTO relationships (user_a, user_b, relationship_type, hide_reason)
+  INSERT INTO profiles (id, name, email, avatar_url, headline)
   VALUES (
-    LEAST(req.from_user_id, auth.uid()),
-    GREATEST(req.from_user_id, auth.uid()),
-    req.relationship_type,
-    req.hide_reason
-  )
-  ON CONFLICT (user_a, user_b) DO NOTHING;
-
-  -- Update contribution scores
-  UPDATE users SET contribution_score = contribution_score + 1 WHERE id = req.from_user_id;
-  UPDATE users SET contribution_score = contribution_score + 1 WHERE id = auth.uid();
-
-  RETURN true;
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'User'),
+    COALESCE(NEW.email, ''),
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.raw_user_meta_data->>'headline'
+  );
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Get user's network depth based on contribution
-CREATE OR REPLACE FUNCTION get_network_depth(user_id UUID)
-RETURNS INTEGER AS $$
-DECLARE
-  rel_count INTEGER;
-BEGIN
-  SELECT COUNT(*) INTO rel_count
-  FROM relationships
-  WHERE user_a = user_id OR user_b = user_id;
-
-  IF rel_count >= 5 THEN
-    RETURN 3; -- Full global network
-  ELSIF rel_count >= 2 THEN
-    RETURN 2; -- Friends of friends
-  ELSE
-    RETURN 1; -- Local network only
-  END IF;
-END;
-$$ LANGUAGE plpgsql;
-
--- ============================================
--- 5. Indexes
--- ============================================
-CREATE INDEX IF NOT EXISTS idx_users_phone_hash ON users(phone_hash);
-CREATE INDEX IF NOT EXISTS idx_requests_to_phone ON relationship_requests(to_phone_hash);
-CREATE INDEX IF NOT EXISTS idx_requests_status ON relationship_requests(status);
-CREATE INDEX IF NOT EXISTS idx_relationships_users ON relationships(user_a, user_b);
+-- Trigger to create profile on signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();

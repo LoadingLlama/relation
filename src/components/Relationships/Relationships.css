@@ -187,7 +187,7 @@
 }
 
 .relationship-form label {
-  color: #888;
+  color: #fff;
   font-size: 0.8rem;
   font-weight: 500;
   text-transform: uppercase;
@@ -195,7 +195,8 @@
 }
 
 .relationship-form input[type="text"],
-.relationship-form input[type="tel"] {
+.relationship-form input[type="tel"],
+.relationship-form input[type="email"] {
   padding: 0.625rem 0.875rem;
   border-radius: 6px;
   border: 1px solid #3d3d3d;
@@ -266,7 +267,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #5856D6 0%, #007AFF 100%);
+  background: #007AFF;
   color: #fff;
   display: flex;
   align-items: center;
@@ -277,11 +278,11 @@
 }
 
 .request-avatar.outgoing {
-  background: linear-gradient(135deg, #636366 0%, #8E8E93 100%);
+  background: #636366;
 }
 
 .request-avatar.connected {
-  background: linear-gradient(135deg, #34C759 0%, #30D158 100%);
+  background: #34C759;
 }
 
 .request-info {
@@ -299,6 +300,11 @@
 }
 
 .request-type {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.request-headline {
   font-size: 0.8rem;
   color: #888;
 }
@@ -440,7 +446,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #5856D6 0%, #007AFF 100%);
+  background: #007AFF;
   color: #fff;
   display: flex;
   align-items: center;
@@ -471,6 +477,17 @@
   color: #007AFF;
   font-style: normal;
   font-weight: 500;
+}
+
+.requester-headline {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.requester-message {
+  font-size: 0.85rem;
+  color: #007AFF;
+  margin-top: 4px;
 }
 
 .accept-form {

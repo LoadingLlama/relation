@@ -1,13 +1,14 @@
 /**
  * ContactsList - Simple text list of contacts (macOS style)
+ * Shows name and headline for each contact
  */
 
-import { Relationship } from '../../types';
+import { Connection } from '../../types';
 import './Contacts.css';
 
 interface ContactsListProps {
-  relationships: Relationship[];
-  onContactClick: (relationship: Relationship) => void;
+  relationships: Connection[];
+  onContactClick: (connection: Connection) => void;
   selectedId?: string;
   currentUserId: string;
 }
@@ -27,7 +28,7 @@ export function ContactsList({ relationships, onContactClick, selectedId }: Cont
     if (!acc[letter]) acc[letter] = [];
     acc[letter].push(rel);
     return acc;
-  }, {} as Record<string, Relationship[]>);
+  }, {} as Record<string, Connection[]>);
 
   const letters = Object.keys(grouped).sort();
 
@@ -45,17 +46,20 @@ export function ContactsList({ relationships, onContactClick, selectedId }: Cont
       {letters.map(letter => (
         <div key={letter}>
           <div className="contacts-section">{letter}</div>
-          {grouped[letter].map(rel => {
-            const contact = rel.user_b_data;
+          {grouped[letter].map(connection => {
+            const contact = connection.user_b_data;
             if (!contact) return null;
 
             return (
               <div
-                key={rel.id}
-                className={`contact-item ${selectedId === rel.id ? 'selected' : ''}`}
-                onClick={() => onContactClick(rel)}
+                key={connection.id}
+                className={`contact-item ${selectedId === connection.id ? 'selected' : ''}`}
+                onClick={() => onContactClick(connection)}
               >
                 <span className="contact-name">{contact.name}</span>
+                {contact.headline && (
+                  <span className="contact-headline">{contact.headline}</span>
+                )}
               </div>
             );
           })}

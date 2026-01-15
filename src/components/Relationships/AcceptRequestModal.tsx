@@ -1,39 +1,29 @@
 /**
  * Modal for accepting an incoming connection request
- * Allows user to verify and optionally modify how they know the person
+ * Simple accept/decline flow
  */
 
-import { useState, FormEvent } from 'react';
-import { RelationshipRequest } from '../../types';
+import { useState } from 'react';
+import { ConnectionRequest } from '../../types';
 import './Relationships.css';
 
 interface AcceptRequestModalProps {
   isOpen: boolean;
-  request: RelationshipRequest | null;
+  request: ConnectionRequest | null;
   onClose: () => void;
-  onAccept: (requestId: string, relationshipType: string) => void;
+  onAccept: (requestId: string) => void;
   onDecline: (requestId: string) => void;
 }
 
 export function AcceptRequestModal({ isOpen, request, onClose, onAccept, onDecline }: AcceptRequestModalProps) {
-  const [relationshipType, setRelationshipType] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Reset form when request changes
-  if (request && relationshipType === '' && request.relationship_type) {
-    setRelationshipType(request.relationship_type);
-  }
 
   if (!isOpen || !request) return null;
 
-  const handleAccept = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!relationshipType.trim()) return;
-
+  const handleAccept = async () => {
     setLoading(true);
     try {
-      await onAccept(request.id, relationshipType);
-      setRelationshipType('');
+      await onAccept(request.id);
       onClose();
     } finally {
       setLoading(false);
@@ -42,7 +32,6 @@ export function AcceptRequestModal({ isOpen, request, onClose, onAccept, onDecli
 
   const handleDecline = () => {
     onDecline(request.id);
-    setRelationshipType('');
     onClose();
   };
 
@@ -61,36 +50,23 @@ export function AcceptRequestModal({ isOpen, request, onClose, onAccept, onDecli
             </div>
             <div className="requester-details">
               <span className="requester-name">{request.from_name}</span>
-              <span className="requester-says">
-                says you're their <em>{request.relationship_type}</em>
+              {request.from_headline && (
+                <span className="requester-headline">{request.from_headline}</span>
+              )}
+              <span className="requester-message">
+                wants to connect with you
               </span>
             </div>
           </div>
 
-          <form onSubmit={handleAccept} className="accept-form">
-            <div className="form-group">
-              <label htmlFor="accept-type">How do you know them?</label>
-              <input
-                id="accept-type"
-                type="text"
-                value={relationshipType}
-                onChange={e => setRelationshipType(e.target.value)}
-                placeholder="e.g., Friend, Coworker, Classmate"
-                maxLength={30}
-                required
-              />
-              <span className="form-hint">Confirm or update how you know each other</span>
-            </div>
-
-            <div className="modal-actions accept-actions">
-              <button type="button" className="btn-decline" onClick={handleDecline}>
-                Decline
-              </button>
-              <button type="submit" className="btn-accept" disabled={loading || !relationshipType.trim()}>
-                {loading ? 'Accepting...' : 'Accept'}
-              </button>
-            </div>
-          </form>
+          <div className="modal-actions accept-actions">
+            <button type="button" className="btn-decline" onClick={handleDecline}>
+              Decline
+            </button>
+            <button type="button" className="btn-accept" onClick={handleAccept} disabled={loading}>
+              {loading ? 'Accepting...' : 'Accept'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

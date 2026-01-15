@@ -25,7 +25,7 @@ export async function signInWithLinkedIn() {
   });
 
   if (error) {
-    console.error('LinkedIn sign in error:', error);
+    console.error('LinkedIn sign in error:', error.message);
     throw error;
   }
 
@@ -38,7 +38,7 @@ export async function signInWithLinkedIn() {
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) {
-    console.error('Sign out error:', error);
+    console.error('Sign out error:', error.message);
     throw error;
   }
 }
@@ -49,7 +49,7 @@ export async function signOut() {
 export async function getSession() {
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error) {
-    console.error('Get session error:', error);
+    console.error('Get session error:', error.message);
     throw error;
   }
   return session;
@@ -66,7 +66,7 @@ export async function getProfile(userId: string) {
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    console.error('Get profile error:', error);
+    console.error('Get profile error:', error.message);
     throw error;
   }
 
@@ -74,20 +74,53 @@ export async function getProfile(userId: string) {
 }
 
 /**
- * Get user's connections
+ * Get user's connections with profile data
  */
 export async function getConnections(userId: string) {
-  const { data, error } = await supabase
+  // Get connections where user is either user_a or user_b
+  const { data: connections, error } = await supabase
     .from('connections')
     .select('*')
     .or(`user_a.eq.${userId},user_b.eq.${userId}`);
 
   if (error) {
-    console.error('Get connections error:', error);
+    console.error('Get connections error:', error.message);
     throw error;
   }
 
-  return data || [];
+  if (!connections || connections.length === 0) {
+    return [];
+  }
+
+  // Get the IDs of the other users in each connection
+  const otherUserIds = connections.map(conn =>
+    conn.user_a === userId ? conn.user_b : conn.user_a
+  );
+
+  // Fetch profiles for all connected users
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('id', otherUserIds);
+
+  if (profilesError) {
+    console.error('Get connection profiles error:', profilesError.message);
+    // Return connections without profile data if fetch fails
+    return connections;
+  }
+
+  // Create a map of profiles by ID
+  const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+  // Attach profile data to each connection
+  return connections.map(conn => {
+    const otherUserId = conn.user_a === userId ? conn.user_b : conn.user_a;
+    const profile = profileMap.get(otherUserId);
+    return {
+      ...conn,
+      other_user_profile: profile || null,
+    };
+  });
 }
 
 /**
@@ -105,7 +138,7 @@ export async function createConnection(userA: string, userB: string) {
     .single();
 
   if (error) {
-    console.error('Create connection error:', error);
+    console.error('Create connection error:', error.message);
     throw error;
   }
 
@@ -122,26 +155,58 @@ export async function deleteConnection(connectionId: string) {
     .eq('id', connectionId);
 
   if (error) {
-    console.error('Delete connection error:', error);
+    console.error('Delete connection error:', error.message);
     throw error;
   }
 }
 
 /**
- * Get connection requests for a user
+ * Get connection requests for a user (by user ID or phone number)
  */
-export async function getConnectionRequests(userId: string) {
-  const { data, error } = await supabase
+export async function getConnectionRequests(userId: string, userPhone?: string | null) {
+  let query = supabase
     .from('connection_requests')
-    .select('*')
+    .select('*, from_profile:profiles!connection_requests_from_user_id_fkey(id, name, headline, avatar_url)')
     .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`);
 
+  const { data, error } = await query;
+
   if (error) {
-    console.error('Get connection requests error:', error);
+    console.error('Get connection requests error:', error.message);
     throw error;
   }
 
   return data || [];
+}
+
+/**
+ * Get incoming requests by phone number (for users who haven't been matched yet)
+ * Note: RLS policy filters to only requests where to_phone matches current user's phone
+ */
+export async function getIncomingRequestsByPhone(phone: string) {
+  if (!phone) return [];
+
+  // Normalize phone to just digits for query
+  const normalizedPhone = phone.replace(/\D/g, '');
+  if (normalizedPhone.length < 10) return [];
+
+  // Query with server-side filtering - RLS policy handles security
+  const { data, error } = await supabase
+    .from('connection_requests')
+    .select('*, from_profile:profiles!connection_requests_from_user_id_fkey(id, name, headline, avatar_url)')
+    .eq('status', 'pending')
+    .is('to_user_id', null);
+
+  if (error) {
+    console.error('Get incoming requests by phone error:', error.message);
+    throw error;
+  }
+
+  // RLS policy should filter, but double-check phone match for safety
+  return (data || []).filter(req => {
+    const reqPhone = (req.to_phone || '').replace(/\D/g, '');
+    return reqPhone === normalizedPhone;
+  });
 }
 
 /**
@@ -150,7 +215,7 @@ export async function getConnectionRequests(userId: string) {
 export async function createConnectionRequest(request: {
   from_user_id: string;
   to_phone: string;
-  to_name: string;
+  to_name?: string;
 }) {
   const { data, error } = await supabase
     .from('connection_requests')
@@ -162,7 +227,7 @@ export async function createConnectionRequest(request: {
     .single();
 
   if (error) {
-    console.error('Create connection request error:', error);
+    console.error('Create connection request error:', error.message);
     throw error;
   }
 
@@ -181,8 +246,58 @@ export async function updateConnectionRequest(requestId: string, status: 'accept
     .single();
 
   if (error) {
-    console.error('Update connection request error:', error);
+    console.error('Update connection request error:', error.message);
     throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Accept a connection request and create the connection
+ */
+export async function acceptConnectionRequest(requestId: string, currentUserId: string) {
+  // Get the request details
+  const { data: request, error: fetchError } = await supabase
+    .from('connection_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single();
+
+  if (fetchError) {
+    console.error('Fetch request error:', fetchError.message);
+    throw fetchError;
+  }
+
+  // Create the connection
+  const { error: connectionError } = await supabase
+    .from('connections')
+    .insert({
+      user_a: request.from_user_id,
+      user_b: currentUserId,
+      connected_at: new Date().toISOString(),
+    });
+
+  if (connectionError) {
+    console.error('Accept connection error:', connectionError.message);
+    throw connectionError;
+  }
+
+  // Update the request status
+  const { data, error: updateError } = await supabase
+    .from('connection_requests')
+    .update({
+      status: 'accepted',
+      to_user_id: currentUserId,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', requestId)
+    .select()
+    .single();
+
+  if (updateError) {
+    console.error('Update request error:', updateError.message);
+    throw updateError;
   }
 
   return data;
@@ -198,7 +313,7 @@ export async function deleteConnectionRequest(requestId: string) {
     .eq('id', requestId);
 
   if (error) {
-    console.error('Delete connection request error:', error);
+    console.error('Delete connection request error:', error.message);
     throw error;
   }
 }
@@ -216,6 +331,10 @@ export async function upsertProfile(profile: {
   about?: string | null;
   avatar_url?: string | null;
   linkedin_url?: string | null;
+  website?: string | null;
+  industry?: string | null;
+  stage?: string | null;
+  raising?: boolean;
   onboarding_completed?: boolean;
 }) {
   const profileData = {
@@ -228,6 +347,10 @@ export async function upsertProfile(profile: {
     about: profile.about ?? null,
     avatar_url: profile.avatar_url ?? null,
     linkedin_url: profile.linkedin_url ?? null,
+    website: profile.website ?? null,
+    industry: profile.industry ?? null,
+    stage: profile.stage ?? null,
+    raising: profile.raising ?? false,
     onboarding_completed: profile.onboarding_completed ?? false,
     updated_at: new Date().toISOString(),
   };
@@ -241,7 +364,6 @@ export async function upsertProfile(profile: {
     .single();
 
   if (updateData) {
-    console.log('Profile updated:', updateData);
     return updateData;
   }
 
@@ -257,15 +379,14 @@ export async function upsertProfile(profile: {
       .single();
 
     if (insertError) {
-      console.error('Insert profile error:', insertError);
+      console.error('Insert profile error:', insertError.message);
       throw insertError;
     }
-    console.log('Profile inserted:', insertData);
     return insertData;
   }
 
   if (updateError) {
-    console.error('Update profile error:', updateError);
+    console.error('Update profile error:', updateError.message);
     throw updateError;
   }
 

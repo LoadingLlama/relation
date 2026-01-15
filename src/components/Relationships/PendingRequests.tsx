@@ -91,7 +91,7 @@ export function PendingRequests({ isOpen, onClose, requests, onAcceptClick, onSi
                       </div>
                       <div className="request-info">
                         <span className="request-name">{request.to_name}</span>
-                        <span className="request-headline">{request.to_email}</span>
+                        <span className="request-headline">{request.to_phone}</span>
                       </div>
                       <div className="request-actions">
                         <span className="status-badge pending">Waiting</span>
@@ -127,7 +127,7 @@ export function PendingRequests({ isOpen, onClose, requests, onAcceptClick, onSi
                   </div>
                   {acceptedRequests.map(request => {
                     const name = request.direction === 'incoming' ? request.from_name : request.to_name;
-                    const headline = request.direction === 'incoming' ? request.from_headline : request.to_email;
+                    const headline = request.direction === 'incoming' ? request.from_headline : request.to_phone;
                     return (
                       <div key={request.id} className="request-item">
                         <div className="request-avatar connected">

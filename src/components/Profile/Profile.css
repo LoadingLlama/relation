@@ -228,10 +228,42 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   padding: 16px;
   background: #2d2d2d;
   border-radius: 8px;
+}
+
+/* Profile Badges (Stage, Raising) */
+.profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.profile-badge.industry {
+  background: rgba(0, 122, 255, 0.15);
+  color: #007AFF;
+}
+
+.profile-badge.stage {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+}
+
+.profile-badge.raising {
+  background: rgba(52, 199, 89, 0.15);
+  color: #34c759;
 }
 
 .contact-link {
@@ -242,6 +274,15 @@
   text-decoration: none;
   font-size: 13px;
   transition: color 0.15s ease;
+}
+
+.contact-link a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.contact-link a:hover {
+  color: #fff;
 }
 
 .contact-link:hover {
@@ -257,7 +298,12 @@
   color: #0077B5;
 }
 
-.contact-link.linkedin:hover {
+.contact-link.linkedin a {
+  color: inherit;
+}
+
+.contact-link.linkedin:hover,
+.contact-link.linkedin a:hover {
   color: #00a0dc;
 }
 
@@ -313,6 +359,17 @@
 
 .connection-card:hover {
   background: #252525;
+}
+
+.connection-card.clickable {
+  cursor: pointer;
+}
+
+.connection-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .connection-card-avatar {
@@ -442,26 +499,6 @@
   height: 120px;
 }
 
-.self-profile-panel .profile-avatar-container {
-  text-align: center;
-}
-
-.self-profile-panel .profile-avatar-large {
-  margin: 0 auto;
-}
-
-.self-profile-panel .profile-identity {
-  text-align: center;
-}
-
-.self-profile-panel .profile-name {
-  justify-content: center;
-}
-
-.self-profile-panel .profile-stats {
-  text-align: center;
-}
-
 /* Edit Form */
 .edit-form {
   display: flex;
@@ -547,6 +584,70 @@
 
 .cancel-edit-btn:hover {
   background: #4d4d4d;
+}
+
+/* Inline Edit Inputs */
+.inline-edit {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 4px;
+  outline: none;
+  font-family: inherit;
+  color: #fff;
+  width: 100%;
+  padding: 6px 8px;
+}
+
+.inline-edit:focus {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.inline-edit::placeholder {
+  color: #888;
+}
+
+.inline-edit-name {
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.inline-edit-headline {
+  font-size: 14px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.inline-edit-location {
+  font-size: 14px;
+  color: #fff;
+}
+
+.inline-edit-contact {
+  font-size: 13px;
+  color: #fff;
+  flex: 1;
+}
+
+.inline-edit-about {
+  font-size: 14px;
+  color: #fff;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 80px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.inline-edit-about:focus {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.placeholder-text {
+  color: #555;
+  font-style: italic;
 }
 
 /* Responsive */

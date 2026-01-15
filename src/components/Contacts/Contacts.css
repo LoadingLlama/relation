@@ -70,6 +70,10 @@
   text-overflow: ellipsis;
 }
 
+.contact-item.selected .contact-name {
+  font-weight: 600;
+}
+
 /* Contact Headline */
 .contact-headline {
   display: block;

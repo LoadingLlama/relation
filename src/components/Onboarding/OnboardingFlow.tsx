@@ -15,8 +15,13 @@ interface OnboardingFlowProps {
   };
   onComplete: (data: {
     phone: string;
+    linkedin_url: string;
+    website: string;
     location: string;
     headline: string;
+    industry: string;
+    stage: string;
+    raising: boolean;
     about: string;
   }) => Promise<void>;
 }
@@ -28,6 +33,22 @@ const STEPS = [
     subtitle: 'Include country code for international contacts',
     placeholder: '+1 (555) 123-4567',
     type: 'tel',
+  },
+  {
+    id: 'linkedin',
+    title: 'What\'s your LinkedIn URL?',
+    subtitle: 'Go to your LinkedIn profile → Copy the URL from browser → Paste here',
+    placeholder: 'linkedin.com/in/yourname',
+    type: 'url',
+    required: true,
+  },
+  {
+    id: 'website',
+    title: 'What\'s your company website?',
+    subtitle: 'Share your startup\'s website if you have one',
+    placeholder: 'yourcompany.com',
+    type: 'url',
+    required: false,
   },
   {
     id: 'location',
@@ -44,9 +65,31 @@ const STEPS = [
     type: 'text',
   },
   {
+    id: 'industry',
+    title: 'What industry is your startup in?',
+    subtitle: 'Type to search or select from suggestions',
+    placeholder: 'e.g., Fintech, Healthcare, SaaS...',
+    type: 'autocomplete',
+  },
+  {
+    id: 'stage',
+    title: 'What stage is your startup?',
+    subtitle: 'Select your current funding stage',
+    placeholder: '',
+    type: 'select',
+    options: ['Bootstrap', 'Pre-seed', 'Seed', 'Series A', 'Series B+', 'Profitable'],
+  },
+  {
+    id: 'raising',
+    title: 'Are you currently raising?',
+    subtitle: 'Let others know if you\'re open to investor introductions',
+    placeholder: '',
+    type: 'boolean',
+  },
+  {
     id: 'about',
-    title: 'Tell us about your business',
-    subtitle: 'What does your startup do?',
+    title: 'Tell us about your company',
+    subtitle: 'What problem does your startup solve? What\'s your vision?',
     placeholder: 'Describe what your company does, the problem you solve, and your vision...',
     type: 'textarea',
   },
@@ -69,6 +112,62 @@ const LOCATION_SUGGESTIONS = [
   'Washington, DC',
   'Phoenix, AZ',
   'Dallas, TX',
+];
+
+// Comprehensive industry list
+const INDUSTRIES = [
+  // Tech & Software
+  'SaaS', 'Enterprise Software', 'Developer Tools', 'DevOps', 'Cybersecurity', 'Cloud Infrastructure',
+  'AI/ML', 'Artificial Intelligence', 'Machine Learning', 'Computer Vision', 'NLP', 'Generative AI',
+  'Data Analytics', 'Big Data', 'Business Intelligence',
+
+  // Finance
+  'Fintech', 'Payments', 'Banking', 'Lending', 'Insurance', 'Insurtech', 'Wealth Management',
+  'Cryptocurrency', 'Blockchain', 'DeFi', 'Web3', 'Trading', 'Personal Finance',
+
+  // Health & Bio
+  'Healthcare', 'Health Tech', 'Digital Health', 'Telemedicine', 'Mental Health',
+  'Biotech', 'Life Sciences', 'Pharmaceuticals', 'Medical Devices', 'Genomics',
+  'Fitness', 'Wellness', 'Nutrition',
+
+  // Commerce & Consumer
+  'E-commerce', 'Retail', 'D2C', 'Marketplace', 'Consumer Products', 'CPG',
+  'Food & Beverage', 'Food Tech', 'Delivery', 'Restaurant Tech',
+  'Fashion', 'Beauty', 'Luxury',
+
+  // Media & Entertainment
+  'Media', 'Entertainment', 'Gaming', 'Esports', 'Streaming', 'Music',
+  'Social Media', 'Creator Economy', 'Content', 'Podcasting', 'Video',
+  'Sports', 'Sports Tech',
+
+  // Enterprise & B2B
+  'Enterprise', 'B2B', 'Sales Tech', 'Marketing Tech', 'AdTech', 'HR Tech',
+  'Recruiting', 'Legal Tech', 'Accounting', 'Procurement', 'Supply Chain',
+
+  // Real Estate & Property
+  'Real Estate', 'PropTech', 'Construction Tech', 'Smart Home', 'Home Services',
+
+  // Transportation & Logistics
+  'Transportation', 'Logistics', 'Mobility', 'Autonomous Vehicles', 'Electric Vehicles',
+  'Delivery', 'Last Mile', 'Fleet Management', 'Shipping',
+
+  // Education
+  'EdTech', 'Education', 'E-learning', 'Corporate Training', 'Upskilling',
+
+  // Climate & Energy
+  'Climate Tech', 'Clean Energy', 'Renewable Energy', 'Sustainability', 'Carbon',
+  'AgTech', 'Agriculture', 'FoodTech', 'Water',
+
+  // Hardware & Manufacturing
+  'Hardware', 'IoT', 'Robotics', 'Manufacturing', '3D Printing', 'Semiconductors',
+  'Aerospace', 'Defense', 'Drones',
+
+  // Services & Other
+  'Professional Services', 'Consulting', 'Staffing', 'Gig Economy', 'Freelance',
+  'Travel', 'Hospitality', 'Events',
+  'Government Tech', 'Civic Tech', 'Non-profit Tech',
+  'Pet Tech', 'Kids & Family', 'Senior Care',
+  'Other',
 ];
 
 // Country codes with flags
@@ -109,13 +208,19 @@ export function OnboardingFlow({ initialData, onComplete }: OnboardingFlowProps)
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
     phone: '',
+    linkedin: '',
+    website: '',
     location: '',
     headline: '',
+    industry: '',
+    stage: '',
+    raising: '',
     about: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [showIndustrySuggestions, setShowIndustrySuggestions] = useState(false);
 
   // Phone input state
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]);
@@ -130,6 +235,16 @@ export function OnboardingFlow({ initialData, onComplete }: OnboardingFlowProps)
   const filteredLocations = LOCATION_SUGGESTIONS.filter(loc =>
     loc.toLowerCase().includes(formData.location.toLowerCase())
   );
+
+  // Filter industry suggestions based on input
+  const filteredIndustries = INDUSTRIES.filter(ind =>
+    ind.toLowerCase().includes(formData.industry.toLowerCase())
+  ).slice(0, 8); // Limit to 8 suggestions
+
+  const handleIndustrySelect = (industry: string) => {
+    setFormData(prev => ({ ...prev, industry }));
+    setShowIndustrySuggestions(false);
+  };
 
   // Build full phone number from country code + digits
   const getFullPhoneNumber = () => {
@@ -178,9 +293,26 @@ export function OnboardingFlow({ initialData, onComplete }: OnboardingFlowProps)
     if (isLastStep) {
       setLoading(true);
       try {
+        // Normalize LinkedIn URL
+        let linkedinUrl = formData.linkedin.trim();
+        if (linkedinUrl && !linkedinUrl.startsWith('http')) {
+          linkedinUrl = 'https://' + linkedinUrl;
+        }
+
+        // Normalize website URL
+        let websiteUrl = formData.website.trim();
+        if (websiteUrl && !websiteUrl.startsWith('http')) {
+          websiteUrl = 'https://' + websiteUrl;
+        }
+
         await onComplete({
           ...formData,
           phone: getFullPhoneNumber(),
+          linkedin_url: linkedinUrl,
+          website: websiteUrl,
+          industry: formData.industry,
+          stage: formData.stage,
+          raising: formData.raising === 'yes',
         });
       } catch (err: unknown) {
         console.error('Onboarding error:', err);
@@ -252,11 +384,30 @@ export function OnboardingFlow({ initialData, onComplete }: OnboardingFlowProps)
     if (step.id === 'phone') {
       return phoneDigits.filter(d => d !== '').length === 10;
     }
+    if (step.id === 'linkedin') {
+      // LinkedIn is required and must look like a LinkedIn URL
+      const linkedin = formData.linkedin.trim();
+      if (!linkedin) return false;
+      return linkedin.includes('linkedin.com');
+    }
+    if (step.id === 'website') {
+      // Website is optional - always valid
+      return true;
+    }
     if (step.id === 'location') {
       return formData.location.trim().length > 0;
     }
     if (step.id === 'headline') {
       return formData.headline.trim().length > 0;
+    }
+    if (step.id === 'industry') {
+      return formData.industry.trim().length > 0;
+    }
+    if (step.id === 'stage') {
+      return formData.stage.length > 0;
+    }
+    if (step.id === 'raising') {
+      return formData.raising.length > 0;
     }
     if (step.id === 'about') {
       const wordCount = formData.about.trim().split(/\s+/).filter(w => w).length;
@@ -427,10 +578,70 @@ export function OnboardingFlow({ initialData, onComplete }: OnboardingFlowProps)
               </div>
             )}
           </div>
+        ) : step.type === 'autocomplete' ? (
+          <div className="autocomplete-wrapper">
+            <input
+              className="onboarding-input"
+              type="text"
+              value={formData.industry}
+              onChange={e => {
+                setFormData(prev => ({ ...prev, industry: e.target.value }));
+                setShowIndustrySuggestions(true);
+              }}
+              onFocus={() => setShowIndustrySuggestions(true)}
+              onBlur={() => setTimeout(() => setShowIndustrySuggestions(false), 150)}
+              placeholder={step.placeholder}
+              autoFocus
+            />
+            {showIndustrySuggestions && filteredIndustries.length > 0 && (
+              <div className="autocomplete-suggestions">
+                {filteredIndustries.map(ind => (
+                  <button
+                    key={ind}
+                    type="button"
+                    className={`autocomplete-item ${formData.industry === ind ? 'selected' : ''}`}
+                    onMouseDown={() => handleIndustrySelect(ind)}
+                  >
+                    {ind}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : step.type === 'select' ? (
+          <div className="select-options">
+            {(step as { options?: string[] }).options?.map(option => (
+              <button
+                key={option}
+                type="button"
+                className={`select-option ${formData[step.id as keyof typeof formData] === option ? 'selected' : ''}`}
+                onClick={() => setFormData(prev => ({ ...prev, [step.id]: option }))}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        ) : step.type === 'boolean' ? (
+          <div className="boolean-options">
+            <button
+              type="button"
+              className={`boolean-option ${formData.raising === 'yes' ? 'selected' : ''}`}
+              onClick={() => setFormData(prev => ({ ...prev, raising: 'yes' }))}
+            >
+              Yes, I'm raising
+            </button>
+            <button
+              type="button"
+              className={`boolean-option ${formData.raising === 'no' ? 'selected' : ''}`}
+              onClick={() => setFormData(prev => ({ ...prev, raising: 'no' }))}
+            >
+              No, not right now
+            </button>
+          </div>
         ) : (
           <input
             className="onboarding-input"
-            type={step.type}
+            type={step.type === 'url' ? 'text' : step.type}
             value={currentValue}
             onChange={e => setFormData(prev => ({ ...prev, [step.id]: e.target.value }))}
             placeholder={step.placeholder}
@@ -451,6 +662,14 @@ export function OnboardingFlow({ initialData, onComplete }: OnboardingFlowProps)
           )}
         </div>
         <div className="actions-right">
+          {step.id === 'website' && !formData.website && (
+            <button
+              className="btn-skip"
+              onClick={handleNext}
+            >
+              I don't have one
+            </button>
+          )}
           <button
             className={`btn-next ${!isCurrentStepValid() ? 'btn-next-disabled' : ''}`}
             onClick={handleNext}

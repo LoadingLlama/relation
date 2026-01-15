@@ -115,6 +115,10 @@ const generateMockUser = (name: string): User => ({
   avatar_url: null,
   banner_url: null,
   linkedin_url: generateLinkedIn(name),
+  website: null,
+  industry: null,
+  stage: null,
+  raising: false,
   connection_count: Math.floor(Math.random() * 400) + 50,
   connections: generateMockConnections(),
   created_at: new Date().toISOString(),
@@ -133,6 +137,10 @@ interface DbProfile {
   avatar_url: string | null;
   banner_url: string | null;
   linkedin_url: string | null;
+  website: string | null;
+  industry: string | null;
+  stage: string | null;
+  raising: boolean;
   onboarding_completed: boolean;
 }
 
@@ -148,6 +156,10 @@ const dbProfileToUser = (profile: DbProfile): User => ({
   avatar_url: profile.avatar_url,
   banner_url: profile.banner_url,
   linkedin_url: profile.linkedin_url,
+  website: profile.website,
+  industry: profile.industry,
+  stage: profile.stage,
+  raising: profile.raising || false,
   connection_count: 0,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -208,15 +220,25 @@ function App() {
           // Load connections from database
           try {
             const dbConnections = await getConnections(userId);
-            // Convert to Connection type with mock user data for now
-            const loadedConnections = dbConnections.map((conn: { id: string; user_a: string; user_b: string; connected_at: string; created_at?: string; connection_name?: string }) => ({
-              id: conn.id,
-              user_a: conn.user_a,
-              user_b: conn.user_b,
-              connected_at: conn.connected_at,
-              created_at: conn.created_at || conn.connected_at,
-              user_b_data: generateMockUser(conn.connection_name || 'Connection'),
-            }));
+            // Convert to Connection type with real profile data
+            const loadedConnections = dbConnections.map((conn: {
+              id: string;
+              user_a: string;
+              user_b: string;
+              connected_at: string;
+              created_at?: string;
+              other_user_profile?: DbProfile | null;
+            }) => {
+              const profile = conn.other_user_profile;
+              return {
+                id: conn.id,
+                user_a: conn.user_a,
+                user_b: conn.user_b,
+                connected_at: conn.connected_at,
+                created_at: conn.created_at || conn.connected_at,
+                user_b_data: profile ? dbProfileToUser(profile) : generateMockUser('Unknown'),
+              };
+            });
             setConnections(loadedConnections);
           } catch (connErr) {
             console.error('Error loading connections:', connErr);
@@ -231,23 +253,16 @@ function App() {
   };
 
   // Handle onboarding completion
-  const handleOnboardingComplete = async (data: { phone: string; location: string; headline: string; about: string }) => {
+  const handleOnboardingComplete = async (data: { phone: string; linkedin_url: string; website: string; location: string; headline: string; industry: string; stage: string; raising: boolean; about: string }) => {
     if (!session?.user) {
       throw new Error('No active session');
     }
 
-    // Get user metadata from LinkedIn
+    // Get user metadata from LinkedIn OAuth
     const userData = session.user.user_metadata || {};
     const name = profile?.name || userData.full_name || userData.name || 'User';
     const email = profile?.email || session.user.email || '';
     const avatar_url = profile?.avatar_url || userData.avatar_url || userData.picture || null;
-
-    // Get LinkedIn URL from provider data
-    const linkedinUrl = userData.provider_id
-      ? `https://linkedin.com/in/${userData.provider_id}`
-      : userData.sub
-        ? `https://linkedin.com/in/${userData.sub}`
-        : null;
 
     // Auto-format headline with "Founder at" prefix
     const headline = data.headline ? `Founder at ${data.headline}` : null;
@@ -261,7 +276,11 @@ function App() {
       about: data.about || null,
       headline,
       avatar_url,
-      linkedin_url: linkedinUrl,
+      linkedin_url: data.linkedin_url || null,
+      website: data.website || null,
+      industry: data.industry || null,
+      stage: data.stage || null,
+      raising: data.raising,
       onboarding_completed: true,
     });
 
@@ -281,16 +300,62 @@ function App() {
   const pendingCount = requests.filter(r => r.status === 'pending' && r.direction === 'incoming').length;
   const sentCount = requests.filter(r => r.status === 'pending' && r.direction === 'outgoing').length;
 
-  // Create connection request
+  // Create connection request - immediately adds as connection for demo
   const handleAddConnection = useCallback(async (data: ConnectionRequestForm) => {
     if (!currentUser) return;
 
+    // Create connection immediately (demo mode)
+    const newConnection: Connection = {
+      id: crypto.randomUUID(),
+      user_a: currentUser.id,
+      user_b: crypto.randomUUID(),
+      connected_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      user_b_data: {
+        id: crypto.randomUUID(),
+        email: '',
+        name: data.to_phone, // Use phone as name for now
+        headline: 'Pending connection',
+        location: '',
+        about: '',
+        phone: data.to_phone,
+        avatar_url: null,
+        banner_url: null,
+        linkedin_url: null,
+        website: null,
+        industry: null,
+        stage: null,
+        raising: false,
+        connection_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    };
+
+    setConnections(prev => [...prev, newConnection]);
+    setSelectedConnection(newConnection);
+
     try {
-      // Save to database
+      // Also save request to database for matching
+      await createConnectionRequest({
+        from_user_id: currentUser.id,
+        to_phone: data.to_phone,
+        to_name: data.to_phone,
+      });
+    } catch (err) {
+      console.error('Error saving connection request:', err);
+    }
+  }, [currentUser]);
+
+  // Legacy create request (keeping for reference)
+  const handleAddConnectionLegacy = useCallback(async (data: ConnectionRequestForm) => {
+    if (!currentUser) return;
+
+    try {
       const dbRequest = await createConnectionRequest({
         from_user_id: currentUser.id,
         to_phone: data.to_phone,
-        to_name: data.to_name,
+        to_name: data.to_phone,
       });
 
       const newRequest: ConnectionRequest = {
@@ -298,7 +363,7 @@ function App() {
         from_user_id: currentUser.id,
         to_phone: data.to_phone,
         to_user_id: null,
-        to_name: data.to_name,
+        to_name: data.to_phone,
         status: 'pending',
         direction: 'outgoing',
         created_at: dbRequest.created_at,
@@ -308,7 +373,6 @@ function App() {
       setRequests(prev => [...prev, newRequest]);
     } catch (err) {
       console.error('Error creating connection request:', err);
-      // Still add locally for demo purposes
       const newRequest: ConnectionRequest = {
         id: crypto.randomUUID(),
         from_user_id: currentUser.id,
@@ -367,12 +431,16 @@ function App() {
         id: session.user.id,
         name: updates.name || currentUser?.name || '',
         email: updates.email || currentUser?.email || '',
-        phone: updates.phone,
-        headline: updates.headline,
-        location: updates.location,
-        about: updates.about,
-        avatar_url: updates.avatar_url,
-        linkedin_url: updates.linkedin_url,
+        phone: updates.phone ?? currentUser?.phone,
+        headline: updates.headline ?? currentUser?.headline,
+        location: updates.location ?? currentUser?.location,
+        about: updates.about ?? currentUser?.about,
+        avatar_url: updates.avatar_url ?? currentUser?.avatar_url,
+        linkedin_url: updates.linkedin_url ?? currentUser?.linkedin_url,
+        website: updates.website ?? currentUser?.website,
+        industry: updates.industry ?? currentUser?.industry,
+        stage: updates.stage ?? currentUser?.stage,
+        raising: updates.raising ?? currentUser?.raising ?? false,
         onboarding_completed: true,
       });
     } catch (err) {
@@ -537,8 +605,6 @@ function App() {
             >
               +
             </button>
-          </div>
-          <div className="panel-footer-center">
             {(pendingCount > 0 || sentCount > 0) && (
               <button
                 className="requests-badge"
@@ -565,8 +631,10 @@ function App() {
         {selectedConnection ? (
           <ProfilePanel
             connection={selectedConnection}
+            allConnections={connections}
             onClose={() => setSelectedConnection(null)}
             onRemove={() => removeConnection(selectedConnection.id)}
+            onConnectionClick={handleContactClick}
           />
         ) : showSelfProfile && currentUser ? (
           <SelfProfilePanel

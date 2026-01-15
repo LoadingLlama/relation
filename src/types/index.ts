@@ -25,6 +25,10 @@ export interface User {
   avatar_url: string | null;
   banner_url: string | null;
   linkedin_url: string | null;
+  website: string | null;
+  industry: string | null;
+  stage: string | null;
+  raising: boolean;
   connection_count: number;
   connections?: ConnectionInfo[];
   created_at: string;
@@ -39,7 +43,7 @@ export interface ConnectionRequest {
   from_user_id: string;
   to_phone: string;
   to_user_id: string | null;
-  to_name: string;
+  to_name?: string; // Optional - phone-only requests don't require name
   from_name?: string;
   from_headline?: string;
   status: 'pending' | 'accepted' | 'declined';
@@ -66,8 +70,8 @@ export interface Connection {
  * Form data for creating a connection request
  */
 export interface ConnectionRequestForm {
-  to_name: string;
   to_phone: string;
+  to_name?: string;
 }
 
 // Legacy type aliases for compatibility

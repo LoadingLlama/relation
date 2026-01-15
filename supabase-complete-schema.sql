@@ -1,7 +1,10 @@
--- Relation Database Schema
--- Run this in your Supabase SQL Editor (https://supabase.com/dashboard/project/ufwqkoenmcngcynjiqaz/sql)
+-- Complete Relation Database Schema
+-- Run this in Supabase SQL Editor
 
--- Profiles table (extends Supabase auth.users)
+-- =====================================================
+-- PROFILES TABLE
+-- =====================================================
+
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   name TEXT NOT NULL,
@@ -13,47 +16,46 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_url TEXT,
   banner_url TEXT,
   linkedin_url TEXT,
+  website TEXT,
+  industry TEXT,
+  stage TEXT,
+  raising BOOLEAN DEFAULT FALSE,
   onboarding_completed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable Row Level Security
+-- Add columns if they don't exist (for existing tables)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS website TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS industry TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS stage TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS raising BOOLEAN DEFAULT FALSE;
+
+-- Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can view their own profile
-CREATE POLICY "Users can view own profile" ON profiles
-  FOR SELECT USING (auth.uid() = id);
+-- Drop existing policies
+DROP POLICY IF EXISTS "Users can view profiles" ON profiles;
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can view connected profiles" ON profiles;
+DROP POLICY IF EXISTS "Users can view request sender profiles" ON profiles;
 
--- Policy: Users can insert their own profile
+-- Policies
+CREATE POLICY "Users can view profiles" ON profiles
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
 CREATE POLICY "Users can insert own profile" ON profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Policy: Users can update their own profile
 CREATE POLICY "Users can update own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
--- Policy: Users can view profiles of their connections
-CREATE POLICY "Users can view connected profiles" ON profiles
-  FOR SELECT USING (
-    id IN (
-      SELECT user_b FROM connections WHERE user_a = auth.uid()
-      UNION
-      SELECT user_a FROM connections WHERE user_b = auth.uid()
-    )
-  );
+-- =====================================================
+-- CONNECTIONS TABLE
+-- =====================================================
 
--- Policy: Users can view profiles of people who sent them connection requests
-CREATE POLICY "Users can view request sender profiles" ON profiles
-  FOR SELECT USING (
-    id IN (
-      SELECT from_user_id FROM connection_requests
-      WHERE to_user_id = auth.uid()
-         OR normalize_phone(to_phone) = normalize_phone((SELECT phone FROM profiles WHERE id = auth.uid()))
-    )
-  );
-
--- Connections table
 CREATE TABLE IF NOT EXISTS connections (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_a UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
@@ -63,63 +65,78 @@ CREATE TABLE IF NOT EXISTS connections (
   UNIQUE(user_a, user_b)
 );
 
--- Enable Row Level Security
+-- Enable RLS
 ALTER TABLE connections ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can view their own connections
+-- Drop existing policies
+DROP POLICY IF EXISTS "Users can view own connections" ON connections;
+DROP POLICY IF EXISTS "Users can create connections" ON connections;
+DROP POLICY IF EXISTS "Users can delete own connections" ON connections;
+
+-- Policies
 CREATE POLICY "Users can view own connections" ON connections
   FOR SELECT USING (auth.uid() = user_a OR auth.uid() = user_b);
 
--- Policy: Users can insert connections where they are user_a
 CREATE POLICY "Users can create connections" ON connections
   FOR INSERT WITH CHECK (auth.uid() = user_a);
 
--- Policy: Users can delete their own connections
 CREATE POLICY "Users can delete own connections" ON connections
   FOR DELETE USING (auth.uid() = user_a OR auth.uid() = user_b);
 
--- Connection requests table
+-- =====================================================
+-- CONNECTION REQUESTS TABLE
+-- =====================================================
+
 CREATE TABLE IF NOT EXISTS connection_requests (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   from_user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   to_phone TEXT NOT NULL,
   to_user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  to_name TEXT, -- Optional: name is no longer required
+  to_name TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migration: If to_email exists, rename to to_phone (run separately if needed)
--- DO $$
--- BEGIN
---   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'connection_requests' AND column_name = 'to_email') THEN
---     ALTER TABLE connection_requests RENAME COLUMN to_email TO to_phone;
---   END IF;
--- END $$;
+-- Make to_name nullable if it exists with NOT NULL
+ALTER TABLE connection_requests ALTER COLUMN to_name DROP NOT NULL;
 
--- Enable Row Level Security
+-- Enable RLS
 ALTER TABLE connection_requests ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can view requests they sent or received
-CREATE POLICY "Users can view own requests" ON connection_requests
-  FOR SELECT USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
+-- Drop existing policies
+DROP POLICY IF EXISTS "Users can view own requests" ON connection_requests;
+DROP POLICY IF EXISTS "Users can create requests" ON connection_requests;
+DROP POLICY IF EXISTS "Users can update received requests" ON connection_requests;
+DROP POLICY IF EXISTS "Users can delete sent requests" ON connection_requests;
 
--- Policy: Users can create requests
+-- Policies
+CREATE POLICY "Users can view own requests" ON connection_requests
+  FOR SELECT USING (
+    auth.uid() = from_user_id
+    OR auth.uid() = to_user_id
+  );
+
 CREATE POLICY "Users can create requests" ON connection_requests
   FOR INSERT WITH CHECK (auth.uid() = from_user_id);
 
--- Policy: Users can update requests they received (by user_id or phone match)
-DROP POLICY IF EXISTS "Users can update received requests" ON connection_requests;
 CREATE POLICY "Users can update received requests" ON connection_requests
-  FOR UPDATE USING (
-    auth.uid() = to_user_id
-    OR normalize_phone(to_phone) = normalize_phone((SELECT phone FROM profiles WHERE id = auth.uid()))
-  );
+  FOR UPDATE USING (auth.uid() = to_user_id);
 
--- Policy: Users can delete requests they sent
 CREATE POLICY "Users can delete sent requests" ON connection_requests
   FOR DELETE USING (auth.uid() = from_user_id);
+
+-- =====================================================
+-- FUNCTIONS & TRIGGERS
+-- =====================================================
+
+-- Function to normalize phone numbers
+CREATE OR REPLACE FUNCTION normalize_phone(phone TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  RETURN regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g');
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION handle_new_user()
@@ -143,31 +160,20 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
--- Function to normalize phone numbers (strip all non-digits)
-CREATE OR REPLACE FUNCTION normalize_phone(phone TEXT)
-RETURNS TEXT AS $$
-BEGIN
-  RETURN regexp_replace(phone, '[^0-9]', '', 'g');
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
--- Function to match connection request to user by phone number
+-- Function to match connection request to user by phone
 CREATE OR REPLACE FUNCTION match_connection_request_to_user()
 RETURNS TRIGGER AS $$
 DECLARE
   matched_user_id UUID;
   normalized_phone TEXT;
 BEGIN
-  -- Normalize the phone number
   normalized_phone := normalize_phone(NEW.to_phone);
 
-  -- Find a user with matching phone number
   SELECT id INTO matched_user_id
   FROM profiles
   WHERE normalize_phone(phone) = normalized_phone
   LIMIT 1;
 
-  -- If found, set the to_user_id
   IF matched_user_id IS NOT NULL THEN
     NEW.to_user_id := matched_user_id;
   END IF;
@@ -176,17 +182,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to match phone on connection request insert
+-- Trigger to match phone on request insert
 DROP TRIGGER IF EXISTS on_connection_request_created ON connection_requests;
 CREATE TRIGGER on_connection_request_created
   BEFORE INSERT ON connection_requests
   FOR EACH ROW EXECUTE FUNCTION match_connection_request_to_user();
 
--- Function to match pending requests when a user updates their phone
+-- Function to match pending requests when user updates phone
 CREATE OR REPLACE FUNCTION match_pending_requests_on_phone_update()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- If phone was updated, find and link any pending requests
   IF NEW.phone IS NOT NULL AND (OLD.phone IS NULL OR NEW.phone != OLD.phone) THEN
     UPDATE connection_requests
     SET to_user_id = NEW.id,
@@ -195,28 +200,39 @@ BEGIN
       AND to_user_id IS NULL
       AND status = 'pending';
   END IF;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to match requests when user updates phone
+-- Triggers to match requests on phone update
 DROP TRIGGER IF EXISTS on_profile_phone_updated ON profiles;
 CREATE TRIGGER on_profile_phone_updated
   AFTER UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION match_pending_requests_on_phone_update();
 
--- Also run on insert for new profiles
 DROP TRIGGER IF EXISTS on_profile_phone_inserted ON profiles;
 CREATE TRIGGER on_profile_phone_inserted
   AFTER INSERT ON profiles
   FOR EACH ROW EXECUTE FUNCTION match_pending_requests_on_phone_update();
 
--- Policy update: Users can view requests sent to their phone number
-DROP POLICY IF EXISTS "Users can view own requests" ON connection_requests;
-CREATE POLICY "Users can view own requests" ON connection_requests
-  FOR SELECT USING (
-    auth.uid() = from_user_id
-    OR auth.uid() = to_user_id
-    OR normalize_phone(to_phone) = normalize_phone((SELECT phone FROM profiles WHERE id = auth.uid()))
-  );
+-- =====================================================
+-- VERIFICATION QUERIES
+-- =====================================================
+
+-- Check RLS is enabled
+SELECT tablename, rowsecurity
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN ('profiles', 'connections', 'connection_requests');
+
+-- List all policies
+SELECT tablename, policyname, cmd
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename;
+
+-- Check table columns
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'profiles'
+ORDER BY ordinal_position;
